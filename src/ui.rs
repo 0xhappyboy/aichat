@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 use crate::ai_models::AIModel;
-use crate::app::{App, InputMode, Message, Sender};
+use crate::app::{App, AppState, InputMode, Message, Sender};
 use crate::i18n::Language;
 
 pub struct Theme {
@@ -79,10 +79,27 @@ impl Theme {
 }
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    if app.show_help {
-        render_help_modal(app, frame, frame.size());
-        return;
+    match app.app_state {
+        AppState::Welcome => {
+            render_welcome_page(app, frame);
+        }
+        AppState::Chatting => {
+            if app.show_help {
+                render_help_modal(app, frame, frame.size());
+            } else {
+                render_chat_interface(app, frame);
+            }
+        }
+        AppState::Help => {
+            render_help_modal(app, frame, frame.size());
+        }
     }
+    if let Some(notification) = &app.notification {
+        render_notification(app, frame, frame.size(), notification);
+    }
+}
+
+fn render_welcome_page(app: &App, frame: &mut Frame) {
     let theme = match app.theme_index {
         0 => Theme::deep_blue(),
         1 => Theme::forest_green(),
@@ -90,7 +107,165 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         3 => Theme::neon(),
         _ => Theme::deep_blue(),
     };
+    let area = frame.size();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(10),
+            Constraint::Length(4),
+        ])
+        .split(area);
+    let title_block = Block::default()
+        .borders(Borders::TOP | Borders::BOTTOM)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme.primary))
+        .style(Style::default().bg(theme.background));
+    let title_content = Paragraph::new(vec![
+        Line::from(Span::styled(
+            app.t("welcome_title"),
+            Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD)
+                .add_modifier(Modifier::SLOW_BLINK),
+        )),
+        Line::from(Span::styled(
+            app.t("welcome_subtitle"),
+            Style::default().fg(theme.secondary),
+        )),
+    ])
+    .alignment(ratatui::layout::Alignment::Center)
+    .block(title_block);
+    frame.render_widget(title_content, chunks[0]);
+    let features_area = centered_rect(70, 60, chunks[1]);
+    let features_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(theme.accent))
+        .style(Style::default().bg(theme.background));
+    let features = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            app.t("welcome_feature1"),
+            Style::default().fg(Color::Cyan),
+        )),
+        Line::from(Span::styled(
+            "  ├─ DeepSeek, ChatGPT, Claude, Gemini",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Llama, Qwen, Custom Model",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            app.t("welcome_feature2"),
+            Style::default().fg(Color::Magenta),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Deep Blue Ocean",
+            Style::default().fg(Color::Blue),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Forest Green",
+            Style::default().fg(Color::Green),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Sunset Orange",
+            Style::default().fg(Color::Rgb(255, 165, 0)),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Neon Cyber",
+            Style::default().fg(Color::Rgb(255, 0, 255)),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            app.t("welcome_feature3"),
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Press C for Chinese",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Press E for English",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            app.t("welcome_feature4"),
+            Style::default().fg(Color::Green),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Real-time message exchange",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Model-specific responses",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            app.t("welcome_feature5"),
+            Style::default().fg(Color::Red),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Arrow keys for navigation",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(Span::styled(
+            "  ├─ F1 for help",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(Span::styled(
+            "  ├─ 1-4 for themes",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(Span::styled(
+            "  ├─ Q to quit",
+            Style::default().fg(theme.text),
+        )),
+        Line::from(""),
+    ];
+    let features_paragraph = Paragraph::new(features)
+        .block(features_block)
+        .alignment(ratatui::layout::Alignment::Left)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(features_paragraph, features_area);
+    let hint_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme.primary))
+        .style(Style::default().bg(theme.background));
+    let hint_content = Paragraph::new(vec![
+        Line::from(Span::styled(
+            app.t("welcome_start_hint"),
+            Style::default()
+                .fg(theme.secondary)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            app.t("welcome_press_enter"),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::SLOW_BLINK)
+                .add_modifier(Modifier::BOLD),
+        )),
+    ])
+    .alignment(ratatui::layout::Alignment::Center)
+    .block(hint_block);
+    frame.render_widget(hint_content, chunks[2]);
+}
 
+fn render_chat_interface(app: &mut App, frame: &mut Frame) {
+    let theme = match app.theme_index {
+        0 => Theme::deep_blue(),
+        1 => Theme::forest_green(),
+        2 => Theme::sunset(),
+        3 => Theme::neon(),
+        _ => Theme::deep_blue(),
+    };
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -104,9 +279,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     render_model_selector(app, frame, main_chunks[1], &theme);
     render_chat_area(app, frame, main_chunks[2], &theme);
     render_input_area(app, frame, main_chunks[3], &theme);
-    if let Some(notification) = &app.notification {
-        render_notification(app, frame, frame.size(), notification, &theme);
-    }
 }
 
 fn render_title_bar(app: &App, frame: &mut Frame, area: Rect, theme: &Theme) {
@@ -475,13 +647,14 @@ fn render_help_modal(app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn render_notification(
-    app: &App,
-    frame: &mut Frame,
-    area: Rect,
-    notification: &str,
-    theme: &Theme,
-) {
+fn render_notification(app: &App, frame: &mut Frame, area: Rect, notification: &str) {
+    let theme = match app.theme_index {
+        0 => Theme::deep_blue(),
+        1 => Theme::forest_green(),
+        2 => Theme::sunset(),
+        3 => Theme::neon(),
+        _ => Theme::deep_blue(),
+    };
     let notification_text = vec![
         Line::from(Span::styled(
             app.t("notification_title"),
@@ -503,7 +676,6 @@ fn render_notification(
         .border_style(Style::default().fg(theme.primary))
         .title("🔔")
         .style(Style::default().bg(theme.background));
-
     let paragraph = Paragraph::new(notification_text)
         .block(block)
         .wrap(Wrap { trim: true });

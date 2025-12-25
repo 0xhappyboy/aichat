@@ -71,6 +71,43 @@ impl Translations {
             "还没有消息。开始对话吧！".to_string(),
         );
         strings.insert("language_selector".to_string(), "语言 (C/E)".to_string());
+
+        strings.insert(
+            "welcome_title".to_string(),
+            "✨ 欢迎使用 AI 聊天终端 ✨".to_string(),
+        );
+        strings.insert(
+            "welcome_subtitle".to_string(),
+            "一个多模型、多主题的 TUI 聊天应用".to_string(),
+        );
+        strings.insert(
+            "welcome_feature1".to_string(),
+            "🎯 支持 7 种 AI 模型切换".to_string(),
+        );
+        strings.insert(
+            "welcome_feature2".to_string(),
+            "🌈 4 种精美主题配色".to_string(),
+        );
+        strings.insert(
+            "welcome_feature3".to_string(),
+            "🌍 中英文双语界面".to_string(),
+        );
+        strings.insert(
+            "welcome_feature4".to_string(),
+            "💬 实时模拟对话体验".to_string(),
+        );
+        strings.insert(
+            "welcome_feature5".to_string(),
+            "⌨️ 快捷键操作，高效便捷".to_string(),
+        );
+        strings.insert(
+            "welcome_start_hint".to_string(),
+            "按 Enter 键开始聊天，按 F1 查看帮助".to_string(),
+        );
+        strings.insert(
+            "welcome_press_enter".to_string(),
+            "按下 Enter 键开始 →".to_string(),
+        );
         strings.insert(
             "help_title".to_string(),
             "📖 帮助 - AI 聊天终端".to_string(),
@@ -155,6 +192,7 @@ impl Translations {
             "help_tips_line4".to_string(),
             "  • 按 C/E 键切换中英文界面".to_string(),
         );
+
         strings.insert(
             "help_close_hint".to_string(),
             "按任意键关闭帮助".to_string(),
@@ -213,6 +251,42 @@ impl Translations {
         strings.insert(
             "language_selector".to_string(),
             "Language (C/E)".to_string(),
+        );
+        strings.insert(
+            "welcome_title".to_string(),
+            "✨ Welcome to AI Chat Terminal ✨".to_string(),
+        );
+        strings.insert(
+            "welcome_subtitle".to_string(),
+            "A Multi-Model, Multi-Theme TUI Chat Application".to_string(),
+        );
+        strings.insert(
+            "welcome_feature1".to_string(),
+            "🎯 Support 7 AI Model Switching".to_string(),
+        );
+        strings.insert(
+            "welcome_feature2".to_string(),
+            "🌈 4 Beautiful Theme Colors".to_string(),
+        );
+        strings.insert(
+            "welcome_feature3".to_string(),
+            "🌍 Chinese/English Bilingual Interface".to_string(),
+        );
+        strings.insert(
+            "welcome_feature4".to_string(),
+            "💬 Real-time Simulated Chat Experience".to_string(),
+        );
+        strings.insert(
+            "welcome_feature5".to_string(),
+            "⌨️ Hotkey Operation, Efficient and Convenient".to_string(),
+        );
+        strings.insert(
+            "welcome_start_hint".to_string(),
+            "Press Enter to start chatting, F1 for help".to_string(),
+        );
+        strings.insert(
+            "welcome_press_enter".to_string(),
+            "Press Enter to Start →".to_string(),
         );
         strings.insert(
             "help_title".to_string(),

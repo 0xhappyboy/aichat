@@ -24,6 +24,13 @@ pub enum InputMode {
     Editing,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum AppState {
+    Welcome,
+    Chatting,
+    Help,
+}
+
 pub struct App {
     pub ai_models: Vec<AIModel>,
     pub selected_model_index: usize,
@@ -42,20 +49,15 @@ pub struct App {
     pub last_update: Instant,
     pub language: Language,
     pub translations: Translations,
+    pub app_state: AppState,
 }
 
 impl App {
     pub fn new() -> Self {
         let ai_models = AIModel::all();
-        let language = Language::Chinese;
+        let language = Language::English;
         let translations = Translations::new(language);
-        let mut messages = Vec::new();
-        let now = Local::now();
-        messages.push(Message {
-            content: translations.get("welcome_message"),
-            sender: Sender::AI(ai_models[0]),
-            timestamp: now,
-        });
+        let messages = Vec::new();
         App {
             ai_models,
             selected_model_index: 0,
@@ -74,6 +76,7 @@ impl App {
             last_update: Instant::now(),
             language,
             translations,
+            app_state: AppState::Welcome,
         }
     }
 
@@ -100,6 +103,14 @@ impl App {
     pub fn send_message(&mut self) {
         if self.input.trim().is_empty() {
             return;
+        }
+        if self.messages.is_empty() {
+            let welcome_message = Message {
+                content: self.t("welcome_message"),
+                sender: Sender::AI(self.current_model()),
+                timestamp: Local::now(),
+            };
+            self.messages.push(welcome_message);
         }
         let user_message = Message {
             content: self.input.clone(),
@@ -159,7 +170,9 @@ impl App {
     }
 
     pub fn toggle_help(&mut self) {
-        self.show_help = !self.show_help;
+        if self.app_state == AppState::Chatting {
+            self.show_help = !self.show_help;
+        }
     }
 
     pub fn change_theme(&mut self, index: usize) {
@@ -206,9 +219,13 @@ impl App {
     pub fn switch_language(&mut self, lang: Language) {
         self.language = lang;
         self.translations = Translations::new(lang);
-        if !self.messages.is_empty() {
+
+        if !self.messages.is_empty()
+            && self.messages[0].content == self.translations.get("welcome_message")
+        {
             self.messages[0].content = self.translations.get("welcome_message");
         }
+
         self.set_notification(self.translations.get("notification_language_changed"));
     }
 
@@ -222,5 +239,13 @@ impl App {
 
     pub fn t(&self, key: &str) -> String {
         self.translations.get(key)
+    }
+
+    pub fn start_chatting(&mut self) {
+        self.app_state = AppState::Chatting;
+    }
+
+    pub fn show_welcome(&mut self) {
+        self.app_state = AppState::Welcome;
     }
 }
