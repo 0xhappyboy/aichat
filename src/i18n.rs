@@ -44,7 +44,7 @@ impl Translations {
 
     fn chinese() -> Self {
         let mut strings = HashMap::new();
-        strings.insert("app_title".to_string(), "✨ AI 聊天终端 v1.0".to_string());
+        strings.insert("app_title".to_string(), "✨ AI 聊天终端".to_string());
         strings.insert(
             "app_subtitle".to_string(),
             "选择 AI 模型并开始智能对话".to_string(),
@@ -218,7 +218,7 @@ impl Translations {
         let mut strings = HashMap::new();
         strings.insert(
             "app_title".to_string(),
-            "✨ AI Chat Terminal v1.0".to_string(),
+            "✨ AI Chat Terminal".to_string(),
         );
         strings.insert(
             "app_subtitle".to_string(),

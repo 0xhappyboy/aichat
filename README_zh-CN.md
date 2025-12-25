@@ -1,6 +1,6 @@
 <h1 align="center">aichat</h1>
 <h4 align="center">
-a terminal-based AI chat application, created purely for fun. by <a href="https://github.com/ratatui/ratatui">ratatui</a>
+一款基于终端的AI聊天应用程序,纯粹为了娱乐而创建. 基于 <a href="https://github.com/ratatui/ratatui">ratatui</a>
 </h4>
 <p align="center">
   <a href="https://https://github.com/0xhappyboy/aichat/LICENSE"><img src="https://img.shields.io/badge/License-GPL3.0-d1d1f6.svg?style=flat&labelColor=1C2C2E&color=BEC5C9&logo=googledocs&label=license&logoColor=BEC5C9" alt="License"></a>
@@ -9,46 +9,46 @@ a terminal-based AI chat application, created purely for fun. by <a href="https:
 <a href="./README_zh-CN.md">简体中文</a> | <a href="./README.md">English</a>
 </p>
 
-# HotKey
+# 快捷键
 
-## General Hotkeys
+## 通用快捷键
 
-- `Enter` - Start chat/Send message
-- `F1` - Show/Hide help
-- `C` - Switch to Chinese
-- `E` - Switch to English
-- `1-4` - Switch themes
-- `Q` - Quit app
+- `Enter` - 进入聊天/发送消息
+- `F1` - 显示/隐藏帮助
+- `C` - 切换为中文界面
+- `E` - 切换为英文界面
+- `1-4` - 切换主题
+- `Q` - 退出应用
 
-## Chat Navigation
+## 聊天界面导航
 
-- `← →` - Switch AI models
-- `↑ ↓` - Scroll chat history
-- `PageUp/Down` - Fast scroll
-- `Home/End` - Jump to top/bottom
+- `← →` - 切换 AI 模型
+- `↑ ↓` - 滚动聊天历史
+- `PageUp/Down` - 快速滚动
+- `Home/End` - 跳至顶部/底部
 
-## Edit Mode
+## 编辑模式
 
-- `i` - Enter edit mode
-- `Esc` - Exit edit mode
-- `Backspace` - Delete character
-- `Delete` - Clear input
+- `i` - 进入编辑模式
+- `Esc` - 退出编辑模式
+- `Backspace` - 删除字符
+- `Delete` - 清空输入
 
-# Theme
+# 主题
 
 <table>
   <tr>
     <td align="left">
-    <h4>Blue</h4>
+    <h4>蓝色</h4>
     </td>
     <td align="left">
-    <h4>Green</h4>
+    <h4>绿色</h4>
     </td>
     <td align="left">
-    <h4>Orange</h4>
+    <h4>橘黄色</h4>
     </td>
     <td align="left">
-    <h4>Neon</h4>
+    <h4>霓虹</h4>
     </td>
   </tr>
   <tr>
