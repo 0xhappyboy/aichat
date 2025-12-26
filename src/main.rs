@@ -1,3 +1,4 @@
+mod ai;
 mod ai_models;
 mod app;
 mod i18n;
@@ -69,37 +70,40 @@ fn run_app<B: ratatui::backend::Backend>(
                                     InputMode::Normal => match key.code {
                                         KeyCode::Left => app.select_previous_model(),
                                         KeyCode::Right => app.select_next_model(),
-                                        KeyCode::Up => app.scroll_up(),
-                                        KeyCode::Down => app.scroll_down(),
-                                        KeyCode::PageUp => {
-                                            for _ in 0..5 {
-                                                app.scroll_up();
+                                        KeyCode::Up => {
+                                            let current = app.ai_list_state.selected().unwrap_or(0);
+                                            let max_scroll = app.get_max_scroll_offset();
+                                            if current < max_scroll {
+                                                app.ai_list_state.select(Some(current + 1));
+                                                app.auto_scroll = false;
                                             }
+                                        }
+                                        KeyCode::Down => {
+                                            let current = app.ai_list_state.selected().unwrap_or(0);
+                                            if current > 0 {
+                                                app.ai_list_state.select(Some(current - 1));
+                                                app.auto_scroll = false;
+                                            }
+                                        }
+                                        KeyCode::PageUp => {
+                                            let current = app.ai_list_state.selected().unwrap_or(0);
+                                            let max_scroll = app.get_max_scroll_offset();
+                                            app.ai_list_state
+                                                .select(Some((current + 10).min(max_scroll)));
+                                            app.auto_scroll = false;
                                         }
                                         KeyCode::PageDown => {
-                                            for _ in 0..5 {
-                                                app.scroll_down();
-                                            }
+                                            let current = app.ai_list_state.selected().unwrap_or(0);
+                                            app.ai_list_state
+                                                .select(Some(current.saturating_sub(10).max(0)));
+                                            app.auto_scroll = false;
                                         }
                                         KeyCode::Home => {
-                                            let ai_messages_count = app
-                                                .messages
-                                                .iter()
-                                                .filter(|msg| {
-                                                    matches!(msg.sender, app::Sender::AI(_))
-                                                })
-                                                .count();
-                                            let user_messages_count =
-                                                app.messages.len() - ai_messages_count;
-                                            app.ai_list_state
-                                                .select(Some(ai_messages_count.saturating_sub(1)));
-                                            app.user_list_state.select(Some(
-                                                user_messages_count.saturating_sub(1),
-                                            ));
+                                            app.ai_list_state.select(Some(0));
+                                            app.auto_scroll = false;
                                         }
                                         KeyCode::End => {
-                                            app.ai_list_state.select(Some(0));
-                                            app.user_list_state.select(Some(0));
+                                            app.scroll_to_end();
                                         }
                                         KeyCode::Char('i') => app.input_mode = InputMode::Editing,
                                         KeyCode::Char('c') | KeyCode::Char('C') => {
@@ -111,6 +115,7 @@ fn run_app<B: ratatui::backend::Backend>(
                                         KeyCode::Enter => {
                                             if !app.input.is_empty() {
                                                 app.send_message();
+                                                app.scroll_to_end();
                                             }
                                         }
                                         KeyCode::F(1) => app.toggle_help(),

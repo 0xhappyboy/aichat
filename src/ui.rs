@@ -433,86 +433,54 @@ fn render_chat_area(app: &App, frame: &mut Frame, area: Rect, theme: &Theme) {
 }
 
 fn render_messages(app: &App, frame: &mut Frame, area: Rect, theme: &Theme) {
-    if app.messages.is_empty() {
+    let messages = app.messages.lock().unwrap();
+    if messages.is_empty() {
         let empty_text = Paragraph::new(app.t("chat_empty"))
             .style(Style::default().fg(theme.secondary))
             .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(empty_text, area);
         return;
     }
-    let items: Vec<ListItem> = app
-        .messages
-        .iter()
-        .map(|msg| {
-            let (is_ai, bubble_color, text_color, bubble_style) = match &msg.sender {
-                Sender::AI(model) => {
-                    let (primary, _, text) = model.colors();
-                    let bubble_color = darken_color(primary, 0.7);
-                    let text_color = text;
-                    let bubble_style = match model {
-                        AIModel::DeepSeek => "🤖",
-                        AIModel::ChatGPT => "🤖",
-                        AIModel::Claude => "🤖",
-                        AIModel::Gemini => "🤖",
-                        AIModel::Llama => "🤖",
-                        AIModel::Qwen => "🤖",
-                        AIModel::Custom => "🤖",
-                    };
-                    (true, bubble_color, text_color, bubble_style)
-                }
-                Sender::User => {
-                    let bubble_color = Color::Rgb(30, 60, 90);
-                    let text_color = theme.text;
-                    (false, bubble_color, text_color, "👤")
-                }
-            };
-            let time = msg.timestamp.format("%H:%M").to_string();
-            let content_lines: Vec<Line> = msg
-                .content
-                .lines()
-                .map(|line| Line::from(Span::styled(line, Style::default().fg(text_color))))
-                .collect();
-            let mut bubble_content = vec![];
-            if is_ai {
-                bubble_content.push(Line::from(vec![
-                    Span::styled(
-                        format!("{} ", bubble_style),
-                        Style::default().fg(theme.accent),
-                    ),
-                    Span::styled(time, Style::default().fg(theme.accent)),
-                ]));
-            } else {
-                bubble_content.push(Line::from(vec![
-                    Span::styled(format!("{} ", time), Style::default().fg(theme.accent)),
-                    Span::styled(bubble_style, Style::default().fg(theme.accent)),
-                ]));
-            }
-            bubble_content.push(Line::from(""));
-            bubble_content.extend(content_lines);
-            bubble_content.push(Line::from(""));
-            let style = if is_ai {
-                Style::default().bg(bubble_color).fg(text_color)
-            } else {
-                Style::default().bg(bubble_color).fg(text_color)
-            };
-            ListItem::new(Text::from(bubble_content)).style(style)
-        })
-        .collect();
-    let list = List::new(items).style(Style::default().bg(theme.background));
-    let mut list_state = app.ai_list_state.clone();
-    frame.render_stateful_widget(list, area, &mut list_state);
-    if app.messages.len() > 0 {
-        let mut scrollbar_state = app.ai_scrollbar_state.clone();
-        frame.render_stateful_widget(
-            Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("↑"))
-                .end_symbol(Some("↓"))
-                .thumb_symbol("█"),
-            area,
-            &mut scrollbar_state,
-        );
+    let mut lines = Vec::new();
+    for msg in messages.iter() {
+        let prefix = match &msg.sender {
+            Sender::User => "👤 ",
+            Sender::AI(_) => "🤖 ",
+            Sender::Thinking(_) => "🤔 ",
+        };
+        let timestamp = msg.timestamp.format("%H:%M").to_string();
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("[{}] ", timestamp),
+                Style::default().fg(theme.accent),
+            ),
+            Span::styled(prefix, Style::default().fg(theme.primary)),
+        ]));
+        for line in msg.content.lines() {
+            lines.push(Line::from(Span::styled(
+                format!("  {}", line),
+                Style::default().fg(theme.text),
+            )));
+        }
+        lines.push(Line::from(""));
     }
+    let scroll_offset = if app.auto_scroll {
+        let total_lines = lines.len();
+        let viewport_height = area.height as usize;
+        if total_lines > viewport_height {
+            (total_lines - viewport_height) as u16
+        } else {
+            0
+        }
+    } else {
+        let selected_index = app.ai_list_state.selected().unwrap_or(0);
+        (selected_index * 3).min(lines.len().saturating_sub(1)) as u16
+    };
+    let paragraph = Paragraph::new(lines)
+        .style(Style::default().bg(theme.background))
+        .wrap(Wrap { trim: true })
+        .scroll((scroll_offset, 0));
+    frame.render_widget(paragraph, area);
 }
 
 fn render_input_area(app: &App, frame: &mut Frame, area: Rect, theme: &Theme) {

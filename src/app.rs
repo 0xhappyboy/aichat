@@ -1,7 +1,9 @@
 use chrono::Local;
 use ratatui::widgets::{ListState, ScrollbarState};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use crate::ai::deepseek::DeepSeekClient;
 use crate::ai_models::AIModel;
 use crate::i18n::{Language, Translations};
 
@@ -16,6 +18,7 @@ pub struct Message {
 pub enum Sender {
     User,
     AI(AIModel),
+    Thinking(AIModel),
 }
 
 #[derive(Debug, PartialEq)]
@@ -34,7 +37,7 @@ pub enum AppState {
 pub struct App {
     pub ai_models: Vec<AIModel>,
     pub selected_model_index: usize,
-    pub messages: Vec<Message>,
+    pub messages: Arc<Mutex<Vec<Message>>>,
     pub input: String,
     pub input_mode: InputMode,
     pub ai_list_state: ListState,
@@ -50,6 +53,8 @@ pub struct App {
     pub language: Language,
     pub translations: Translations,
     pub app_state: AppState,
+    pub thinking_message_index: Option<usize>,
+    pub auto_scroll: bool,
 }
 
 impl App {
@@ -57,11 +62,10 @@ impl App {
         let ai_models = AIModel::all();
         let language = Language::English;
         let translations = Translations::new(language);
-        let messages = Vec::new();
         App {
             ai_models,
             selected_model_index: 0,
-            messages,
+            messages: Arc::new(Mutex::new(Vec::new())),
             input: String::new(),
             input_mode: InputMode::Normal,
             ai_list_state: ListState::default(),
@@ -77,6 +81,8 @@ impl App {
             language,
             translations,
             app_state: AppState::Welcome,
+            thinking_message_index: None,
+            auto_scroll: true,
         }
     }
 
@@ -104,68 +110,135 @@ impl App {
         if self.input.trim().is_empty() {
             return;
         }
-        if self.messages.is_empty() {
+        self.auto_scroll = true;
+        let user_input = self.input.clone();
+        let current_model = self.current_model();
+        let language = self.language;
+        let mut messages = self.messages.lock().unwrap();
+        if messages.is_empty() {
             let welcome_message = Message {
                 content: self.t("welcome_message"),
-                sender: Sender::AI(self.current_model()),
+                sender: Sender::AI(current_model),
                 timestamp: Local::now(),
             };
-            self.messages.push(welcome_message);
+            messages.push(welcome_message);
         }
         let user_message = Message {
-            content: self.input.clone(),
+            content: user_input.clone(),
             sender: Sender::User,
             timestamp: Local::now(),
         };
-        self.messages.push(user_message);
-        self.user_list_state.select(Some(self.messages.len() - 1));
-        let current_model = self.current_model();
-        let ai_response = current_model.simulate_response(&self.input, self.language);
-        let ai_message = Message {
-            content: ai_response,
-            sender: Sender::AI(current_model),
+        messages.push(user_message);
+        let thinking_message = Message {
+            content: match language {
+                Language::Chinese => format!("🤔 {} 正在思考中...", current_model.name(language)),
+                Language::English => format!("🤔 {} is thinking...", current_model.name(language)),
+            },
+            sender: Sender::Thinking(current_model),
             timestamp: Local::now(),
         };
-        self.messages.push(ai_message);
-        self.ai_list_state.select(Some(self.messages.len() - 1));
-        let ai_messages_count = self
-            .messages
+        messages.push(thinking_message);
+        let ai_messages_count = messages
             .iter()
-            .filter(|msg| matches!(msg.sender, Sender::AI(_)))
+            .filter(|msg| matches!(msg.sender, Sender::AI(_) | Sender::Thinking(_)))
             .count();
-        let user_messages_count = self.messages.len() - ai_messages_count;
+        let user_messages_count = messages.len() - ai_messages_count;
         self.ai_scrollbar_state = ScrollbarState::new(ai_messages_count);
         self.user_scrollbar_state = ScrollbarState::new(user_messages_count);
+        drop(messages);
+        let messages_ref = Arc::clone(&self.messages);
+        let model = current_model;
+        if model == AIModel::DeepSeek {
+            tokio::spawn(async move {
+                let response = Self::call_real_deepseek_api(&user_input).await;
+                let mut messages = messages_ref.lock().unwrap();
+                if let Some(pos) = messages
+                    .iter()
+                    .position(|msg| matches!(msg.sender, Sender::Thinking(_)))
+                {
+                    messages.remove(pos);
+                }
+                let ai_message = Message {
+                    content: response,
+                    sender: Sender::AI(model),
+                    timestamp: Local::now(),
+                };
+                messages.push(ai_message);
+            });
+        } else {
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                let mut messages = messages_ref.lock().unwrap();
+                if let Some(pos) = messages
+                    .iter()
+                    .position(|msg| matches!(msg.sender, Sender::Thinking(_)))
+                {
+                    messages.remove(pos);
+                }
+                let ai_message = Message {
+                    content: model.simulate_response(&user_input, language),
+                    sender: Sender::AI(model),
+                    timestamp: Local::now(),
+                };
+                messages.push(ai_message);
+            });
+        }
         self.input.clear();
     }
 
-    pub fn scroll_up(&mut self) {
-        let ai_messages_count = self
-            .messages
-            .iter()
-            .filter(|msg| matches!(msg.sender, Sender::AI(_)))
-            .count();
-        let current_ai_selection = self.ai_list_state.selected().unwrap_or(0);
-        if current_ai_selection < ai_messages_count.saturating_sub(1) {
-            self.ai_list_state.select(Some(current_ai_selection + 1));
+    pub fn get_max_scroll_offset(&self) -> usize {
+        let messages = self.messages.lock().unwrap();
+        if messages.is_empty() {
+            return 0;
         }
-        let user_messages_count = self.messages.len() - ai_messages_count;
-        let current_user_selection = self.user_list_state.selected().unwrap_or(0);
-        if current_user_selection < user_messages_count.saturating_sub(1) {
-            self.user_list_state
-                .select(Some(current_user_selection + 1));
+        let mut total_lines = 0;
+        for msg in messages.iter() {
+            total_lines += 1;
+            total_lines += msg.content.lines().count();
+            total_lines += 1;
+        }
+        total_lines
+    }
+
+    pub fn scroll_up(&mut self) {
+        let current = self.ai_list_state.selected().unwrap_or(0);
+        if current > 0 {
+            self.ai_list_state.select(Some(current - 1));
+            self.auto_scroll = false;
         }
     }
 
     pub fn scroll_down(&mut self) {
-        let current_ai_selection = self.ai_list_state.selected().unwrap_or(0);
-        if current_ai_selection > 0 {
-            self.ai_list_state.select(Some(current_ai_selection - 1));
-        }
-        let current_user_selection = self.user_list_state.selected().unwrap_or(0);
-        if current_user_selection > 0 {
-            self.user_list_state
-                .select(Some(current_user_selection - 1));
+        let current = self.ai_list_state.selected().unwrap_or(0);
+        self.ai_list_state.select(Some(current + 1));
+        self.auto_scroll = false;
+    }
+
+    pub fn scroll_to_home(&mut self) {
+        self.ai_list_state.select(Some(0));
+        self.auto_scroll = false;
+    }
+
+    pub fn scroll_to_end(&mut self) {
+        let messages = self.messages.lock().unwrap();
+        let ai_messages_count = messages
+            .iter()
+            .filter(|msg| matches!(msg.sender, Sender::AI(_) | Sender::Thinking(_)))
+            .count();
+        self.ai_list_state
+            .select(Some(ai_messages_count.saturating_sub(1)));
+        self.auto_scroll = true;
+    }
+
+    async fn call_real_deepseek_api(user_input: &str) -> String {
+        let api_key =
+            std::env::var("DEEPSEEK_API_KEY").unwrap_or_else(|_| "your_api_key_here".to_string());
+        match DeepSeekClient::with_api_key(&api_key) {
+            Ok(client) => match client.simple_chat(user_input, None).await {
+                Ok(response) => response,
+                Err(e) => format!("⚠️ API调用失败: {}", e),
+            },
+            Err(e) => format!("⚠️ 客户端创建失败: {}", e),
         }
     }
 
@@ -219,13 +292,14 @@ impl App {
     pub fn switch_language(&mut self, lang: Language) {
         self.language = lang;
         self.translations = Translations::new(lang);
-
-        if !self.messages.is_empty()
-            && self.messages[0].content == self.translations.get("welcome_message")
         {
-            self.messages[0].content = self.translations.get("welcome_message");
+            let mut messages = self.messages.lock().unwrap();
+            if !messages.is_empty() {
+                if let Some(first_msg) = messages.first_mut() {
+                    first_msg.content = self.translations.get("welcome_message");
+                }
+            }
         }
-
         self.set_notification(self.translations.get("notification_language_changed"));
     }
 
