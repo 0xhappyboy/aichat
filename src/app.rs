@@ -3,7 +3,7 @@ use ratatui::widgets::{ListState, ScrollbarState};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::ai::call_real_deepseek_api;
+use crate::ai::{call_real_aliyun_api, call_real_deepseek_api};
 use crate::ai_models::AIModel;
 use crate::i18n::{Language, Translations};
 
@@ -102,7 +102,7 @@ impl App {
     }
 
     pub fn current_model(&self) -> AIModel {
-        self.ai_models[self.selected_model_index]
+        self.ai_models[self.selected_model_index].clone()
     }
 
     pub fn select_previous_model(&mut self, max_visible: usize) {
@@ -167,13 +167,13 @@ impl App {
         }
         self.auto_scroll = true;
         let user_input = self.input.clone();
-        let current_model = self.current_model();
+        let current_model = self.current_model().clone();
         let language = self.language;
         let mut messages = self.messages.lock().unwrap();
         if messages.is_empty() {
             let welcome_message = Message {
                 content: self.t("welcome_message"),
-                sender: Sender::AI(current_model),
+                sender: Sender::AI(current_model.clone()),
                 timestamp: Local::now(),
             };
             messages.push(welcome_message);
@@ -189,7 +189,7 @@ impl App {
                 Language::Chinese => format!("🤔 {} 正在思考中...", current_model.name(language)),
                 Language::English => format!("🤔 {} is thinking...", current_model.name(language)),
             },
-            sender: Sender::Thinking(current_model),
+            sender: Sender::Thinking(current_model.clone()),
             timestamp: Local::now(),
         };
         messages.push(thinking_message);
@@ -202,44 +202,54 @@ impl App {
         self.user_scrollbar_state = ScrollbarState::new(user_messages_count);
         drop(messages);
         let messages_ref = Arc::clone(&self.messages);
-        let model = current_model;
-        if model == AIModel::DeepSeek {
-            let current_language = self.language;
-            tokio::spawn(async move {
-                let response = call_real_deepseek_api(&user_input, current_language).await;
-                let mut messages = messages_ref.lock().unwrap();
-                if let Some(pos) = messages
-                    .iter()
-                    .position(|msg| matches!(msg.sender, Sender::Thinking(_)))
-                {
-                    messages.remove(pos);
-                }
-                let ai_message = Message {
-                    content: response,
-                    sender: Sender::AI(model),
-                    timestamp: Local::now(),
-                };
-                messages.push(ai_message);
-            });
-        } else {
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(500)).await;
-                let mut messages = messages_ref.lock().unwrap();
-                if let Some(pos) = messages
-                    .iter()
-                    .position(|msg| matches!(msg.sender, Sender::Thinking(_)))
-                {
-                    messages.remove(pos);
-                }
-                let ai_message = Message {
-                    content: model.simulate_response(&user_input, language),
-                    sender: Sender::AI(model),
-                    timestamp: Local::now(),
-                };
-                messages.push(ai_message);
-            });
+        let model = current_model.clone();
+        match model {
+            AIModel::DeepSeek => {
+                let current_language = self.language;
+                tokio::spawn(async move {
+                    let response = call_real_deepseek_api(&user_input, current_language).await;
+                    Self::process_ai_response(messages_ref, model, response).await;
+                });
+            }
+            AIModel::AliYun(aliyun_model_type) => {
+                let current_language = self.language;
+                tokio::spawn(async move {
+                    let response =
+                        call_real_aliyun_api(&user_input, current_language, aliyun_model_type)
+                            .await;
+                    Self::process_ai_response(messages_ref, model, response).await;
+                });
+            }
+            _ => {
+                let language_for_sim = self.language;
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    let response = model.simulate_response(&user_input, language_for_sim);
+                    Self::process_ai_response(messages_ref, model, response).await;
+                });
+            }
         }
         self.input.clear();
+    }
+
+    async fn process_ai_response(
+        messages_ref: Arc<Mutex<Vec<Message>>>,
+        model: AIModel,
+        response: String,
+    ) {
+        let mut messages = messages_ref.lock().unwrap();
+        if let Some(pos) = messages
+            .iter()
+            .position(|msg| matches!(msg.sender, Sender::Thinking(_)))
+        {
+            messages.remove(pos);
+        }
+        let ai_message = Message {
+            content: response,
+            sender: Sender::AI(model),
+            timestamp: Local::now(),
+        };
+        messages.push(ai_message);
     }
 
     pub fn get_max_scroll_offset(&self) -> usize {

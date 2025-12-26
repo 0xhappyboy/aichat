@@ -149,11 +149,11 @@ fn render_welcome_page(app: &App, frame: &mut Frame) {
             Style::default().fg(Color::Cyan),
         )),
         Line::from(Span::styled(
-            "  ├─ DeepSeek, ChatGPT, Claude, Gemini",
+            "  ├─ DeepSeek, Aliyun Qwen, OpenAI",
             Style::default().fg(theme.text),
         )),
         Line::from(Span::styled(
-            "  ├─ Llama, Qwen, Custom Model",
+            "  ├─ Claude, Gemini, Local Models",
             Style::default().fg(theme.text),
         )),
         Line::from(""),
@@ -308,82 +308,16 @@ fn render_model_selector(app: &App, frame: &mut Frame, area: Rect, theme: &Theme
     let horizontal_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(30),
+            Constraint::Percentage(60),
+            Constraint::Percentage(20),
             Constraint::Percentage(20),
         ])
         .split(area);
     let models_area = horizontal_chunks[0];
     let themes_area = horizontal_chunks[1];
     let language_area = horizontal_chunks[2];
-    let models_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme.accent))
-        .title(app.t("model_selector_title"))
-        .title_style(Style::default().fg(theme.primary))
-        .style(Style::default().bg(theme.background));
-    let mut model_spans = Vec::new();
-    let total_models = app.ai_models.len();
-    let available_width = models_area.width as usize;
-    let avg_model_width = 12;
-    let max_visible = ((available_width.saturating_sub(4)) / avg_model_width).max(1);
-    let max_visible = max_visible.min(total_models);
-    let start_index = app.model_display_offset;
-    let end_index = (start_index + max_visible).min(total_models);
-    if start_index > 0 {
-        model_spans.push(Span::styled(
-            "◀ ",
-            Style::default()
-                .fg(theme.primary)
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-    for i in start_index..end_index {
-        let model = &app.ai_models[i];
-        let is_selected = i == app.selected_model_index;
-        let (primary, _, text) = model.colors();
-
-        if i > start_index {
-            model_spans.push(Span::styled("│", Style::default().fg(theme.accent)));
-        }
-        let model_name = model.name(app.language);
-        let display_text = if available_width < 40 {
-            match model {
-                AIModel::DeepSeek => "DS".to_string(),
-                AIModel::ChatGPT => "GPT".to_string(),
-                AIModel::Claude => "CL".to_string(),
-                AIModel::Gemini => "GM".to_string(),
-                AIModel::Llama => "LL".to_string(),
-                AIModel::Qwen => "QW".to_string(),
-                AIModel::Custom => "CT".to_string(),
-            }
-        } else {
-            model_name
-        };
-        let style = if is_selected {
-            Style::default()
-                .fg(text)
-                .bg(primary)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(primary).add_modifier(Modifier::BOLD)
-        };
-        model_spans.push(Span::styled(format!(" {} ", display_text), style));
-    }
-    if end_index < total_models {
-        model_spans.push(Span::styled(
-            " ▶",
-            Style::default()
-                .fg(theme.primary)
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-    let models_line = Line::from(model_spans);
-    let models_paragraph = Paragraph::new(models_line)
-        .alignment(ratatui::layout::Alignment::Center)
-        .block(models_block);
-    frame.render_widget(models_paragraph, models_area);
+    let max_visible = app.calculate_max_visible(models_area.width as usize);
+    render_model_scrollable_selector(app, frame, models_area, theme, max_visible);
     let themes = ["1", "2", "3", "4"];
     let mut theme_spans = Vec::new();
     theme_spans.push(Span::styled(
@@ -477,7 +411,7 @@ fn render_model_scrollable_selector(
     for i in start_index..end_index {
         let model = &app.ai_models[i];
         let is_selected = i == app.selected_model_index;
-        let (primary, _, text) = model.colors();
+        let color = model.color();
         if i > start_index {
             model_spans.push(Span::styled("│", Style::default().fg(theme.accent)));
         }
@@ -485,23 +419,23 @@ fn render_model_scrollable_selector(
         let display_text = if area.width < 40 {
             match model {
                 AIModel::DeepSeek => "DS".to_string(),
-                AIModel::ChatGPT => "GPT".to_string(),
+                AIModel::AliYun(_) => "AL".to_string(),
+                AIModel::OpenAI => "AI".to_string(),
                 AIModel::Claude => "CL".to_string(),
                 AIModel::Gemini => "GM".to_string(),
-                AIModel::Llama => "LL".to_string(),
-                AIModel::Qwen => "QW".to_string(),
-                AIModel::Custom => "CT".to_string(),
+                AIModel::LocalLLM => "LL".to_string(),
+                AIModel::Custom(_) => "CT".to_string(),
             }
         } else {
             model_name
         };
         let style = if is_selected {
             Style::default()
-                .fg(text)
-                .bg(primary)
+                .fg(Color::Black)
+                .bg(color)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(primary).add_modifier(Modifier::BOLD)
+            Style::default().fg(color).add_modifier(Modifier::BOLD)
         };
         model_spans.push(Span::styled(format!(" {} ", display_text), style));
     }
