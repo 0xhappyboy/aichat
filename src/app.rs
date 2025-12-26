@@ -3,7 +3,7 @@ use ratatui::widgets::{ListState, ScrollbarState};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::ai::deepseek::DeepSeekClient;
+use crate::ai::call_real_deepseek_api;
 use crate::ai_models::AIModel;
 use crate::i18n::{Language, Translations};
 
@@ -55,6 +55,7 @@ pub struct App {
     pub app_state: AppState,
     pub thinking_message_index: Option<usize>,
     pub auto_scroll: bool,
+    pub model_display_offset: usize,
 }
 
 impl App {
@@ -83,6 +84,20 @@ impl App {
             app_state: AppState::Welcome,
             thinking_message_index: None,
             auto_scroll: true,
+            model_display_offset: 0,
+        }
+    }
+
+    pub fn update_model_display_offset(&mut self, max_visible: usize) {
+        let total_models = self.ai_models.len();
+        let max_visible = max_visible.min(total_models);
+        if self.selected_model_index < self.model_display_offset {
+            self.model_display_offset = self.selected_model_index;
+        } else if self.selected_model_index >= self.model_display_offset + max_visible {
+            self.model_display_offset = self.selected_model_index - max_visible + 1;
+        }
+        if self.model_display_offset + max_visible > total_models {
+            self.model_display_offset = total_models.saturating_sub(max_visible);
         }
     }
 
@@ -90,20 +105,60 @@ impl App {
         self.ai_models[self.selected_model_index]
     }
 
-    pub fn select_previous_model(&mut self) {
+    pub fn select_previous_model(&mut self, max_visible: usize) {
+        let total_models = self.ai_models.len();
         if self.selected_model_index > 0 {
             self.selected_model_index -= 1;
         } else {
-            self.selected_model_index = self.ai_models.len() - 1;
+            self.selected_model_index = total_models - 1;
         }
+        self.ensure_selected_visible(max_visible);
     }
 
-    pub fn select_next_model(&mut self) {
-        if self.selected_model_index < self.ai_models.len() - 1 {
+    pub fn select_next_model(&mut self, max_visible: usize) {
+        let total_models = self.ai_models.len();
+        if self.selected_model_index < total_models - 1 {
             self.selected_model_index += 1;
         } else {
             self.selected_model_index = 0;
         }
+        self.ensure_selected_visible(max_visible);
+    }
+
+    pub fn ensure_selected_visible(&mut self, max_visible: usize) {
+        let total_models = self.ai_models.len();
+        if self.selected_model_index < self.model_display_offset {
+            self.model_display_offset = self.selected_model_index;
+        } else if self.selected_model_index >= self.model_display_offset + max_visible {
+            self.model_display_offset = self.selected_model_index - max_visible + 1;
+        }
+        if self.model_display_offset + max_visible > total_models {
+            self.model_display_offset = total_models.saturating_sub(max_visible);
+        }
+        if total_models <= max_visible {
+            self.model_display_offset = 0;
+        }
+    }
+
+    pub fn scroll_models_left(&mut self, max_visible: usize) {
+        if self.model_display_offset > 0 {
+            self.model_display_offset -= 1;
+        }
+        self.ensure_selected_visible(max_visible);
+    }
+
+    pub fn scroll_models_right(&mut self, max_visible: usize) {
+        let total_models = self.ai_models.len();
+        if self.model_display_offset + max_visible < total_models {
+            self.model_display_offset += 1;
+        }
+        self.ensure_selected_visible(max_visible);
+    }
+
+    pub fn calculate_max_visible(&self, available_width: usize) -> usize {
+        let avg_model_width = 12;
+        let max_visible = (available_width.saturating_sub(4)) / avg_model_width;
+        max_visible.max(1)
     }
 
     pub fn send_message(&mut self) {
@@ -149,8 +204,9 @@ impl App {
         let messages_ref = Arc::clone(&self.messages);
         let model = current_model;
         if model == AIModel::DeepSeek {
+            let current_language = self.language;
             tokio::spawn(async move {
-                let response = Self::call_real_deepseek_api(&user_input).await;
+                let response = call_real_deepseek_api(&user_input, current_language).await;
                 let mut messages = messages_ref.lock().unwrap();
                 if let Some(pos) = messages
                     .iter()
@@ -228,18 +284,6 @@ impl App {
         self.ai_list_state
             .select(Some(ai_messages_count.saturating_sub(1)));
         self.auto_scroll = true;
-    }
-
-    async fn call_real_deepseek_api(user_input: &str) -> String {
-        let api_key =
-            std::env::var("DEEPSEEK_API_KEY").unwrap_or_else(|_| "your_api_key_here".to_string());
-        match DeepSeekClient::with_api_key(&api_key) {
-            Ok(client) => match client.simple_chat(user_input, None).await {
-                Ok(response) => response,
-                Err(e) => format!("⚠️ API调用失败: {}", e),
-            },
-            Err(e) => format!("⚠️ 客户端创建失败: {}", e),
-        }
     }
 
     pub fn toggle_help(&mut self) {

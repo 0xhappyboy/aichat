@@ -68,8 +68,22 @@ fn run_app<B: ratatui::backend::Backend>(
                             } else {
                                 match app.input_mode {
                                     InputMode::Normal => match key.code {
-                                        KeyCode::Left => app.select_previous_model(),
-                                        KeyCode::Right => app.select_next_model(),
+                                        KeyCode::Left => {
+                                            if app.input_mode == InputMode::Normal {
+                                                let available_width = 100;
+                                                let max_visible =
+                                                    app.calculate_max_visible(available_width);
+                                                app.select_previous_model(max_visible);
+                                            }
+                                        }
+                                        KeyCode::Right => {
+                                            if app.input_mode == InputMode::Normal {
+                                                let available_width = 100;
+                                                let max_visible =
+                                                    app.calculate_max_visible(available_width);
+                                                app.select_next_model(max_visible);
+                                            }
+                                        }
                                         KeyCode::Up => {
                                             let current = app.ai_list_state.selected().unwrap_or(0);
                                             let max_scroll = app.get_max_scroll_offset();

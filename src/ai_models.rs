@@ -1,14 +1,14 @@
-use ratatui::style::{Color, Modifier, Style};
 use crate::i18n::Language;
+use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AIModel {
     DeepSeek,
+    Qwen,
     ChatGPT,
     Claude,
     Gemini,
     Llama,
-    Qwen,
     Custom,
 }
 
@@ -16,11 +16,21 @@ impl AIModel {
     pub fn all() -> Vec<Self> {
         vec![
             Self::DeepSeek,
+            Self::Qwen,
             Self::ChatGPT,
             Self::Claude,
             Self::Gemini,
             Self::Llama,
-            Self::Qwen,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
+            Self::Custom,
             Self::Custom,
         ]
     }

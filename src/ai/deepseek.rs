@@ -1,8 +1,6 @@
 use futures::StreamExt;
-use reqwest::{Client, Response};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::error::Error;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
