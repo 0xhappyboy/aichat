@@ -9,6 +9,10 @@
 <a href="./README_zh-CN.md">简体中文</a> | <a href="./README.md">English</a>
 </p>
 
+# 演示
+
+<img src="./assets/demo.gif" alt="ai chat demo" width="100%">
+
 # 快捷键
 
 ## 通用快捷键

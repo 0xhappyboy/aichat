@@ -9,6 +9,10 @@ a terminal-based AI chat application, created purely for fun. by <a href="https:
 <a href="./README_zh-CN.md">简体中文</a> | <a href="./README.md">English</a>
 </p>
 
+# Demo
+
+<img src="./assets/demo.gif" alt="ai chat demo" width="100%">
+
 # HotKey
 
 ## General Hotkeys
